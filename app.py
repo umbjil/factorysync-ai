@@ -49,7 +49,7 @@ def load_user(user_id):
     return User.query.get(int(user_id))
 
 def init_db():
-    """Initialize the database and create a test user if it doesn't exist."""
+    """Initialize the database and create test machines and sensors."""
     try:
         # Drop all tables and recreate them
         db.drop_all()
@@ -62,18 +62,95 @@ def init_db():
             db.session.add(admin)
             db.session.commit()
             print("Created admin user successfully")
-        else:
-            print("Admin user already exists")
-            
-        # Create a test machine
-        test_machine = Machine(
-            name='Test Machine',
-            type='Assembly',
-            status='active'
-        )
-        db.session.add(test_machine)
+        
+        # Create machines with their sensors
+        machines = [
+            {
+                'name': 'CNC Mill XR2000',
+                'type': 'CNC Machine',
+                'status': 'active',
+                'sensors': [
+                    {'name': 'Spindle Speed', 'type': 'RPM', 'unit': 'RPM', 'min_value': 0, 'max_value': 12000},
+                    {'name': 'Cutting Force', 'type': 'Force', 'unit': 'N', 'min_value': 0, 'max_value': 5000},
+                    {'name': 'Tool Temperature', 'type': 'Temperature', 'unit': '°C', 'min_value': 0, 'max_value': 200}
+                ]
+            },
+            {
+                'name': 'Injection Molder IM500',
+                'type': 'Injection Molding',
+                'status': 'active',
+                'sensors': [
+                    {'name': 'Mold Temperature', 'type': 'Temperature', 'unit': '°C', 'min_value': 0, 'max_value': 300},
+                    {'name': 'Injection Pressure', 'type': 'Pressure', 'unit': 'bar', 'min_value': 0, 'max_value': 2000},
+                    {'name': 'Screw Position', 'type': 'Position', 'unit': 'mm', 'min_value': 0, 'max_value': 100}
+                ]
+            },
+            {
+                'name': 'Robot Arm UR10',
+                'type': 'Robotic Arm',
+                'status': 'active',
+                'sensors': [
+                    {'name': 'Joint 1 Position', 'type': 'Angle', 'unit': 'degrees', 'min_value': -360, 'max_value': 360},
+                    {'name': 'Joint 2 Position', 'type': 'Angle', 'unit': 'degrees', 'min_value': -360, 'max_value': 360},
+                    {'name': 'End Effector Force', 'type': 'Force', 'unit': 'N', 'min_value': 0, 'max_value': 100}
+                ]
+            },
+            {
+                'name': 'Laser Cutter LC1000',
+                'type': 'Laser Cutting',
+                'status': 'active',
+                'sensors': [
+                    {'name': 'Laser Power', 'type': 'Power', 'unit': 'W', 'min_value': 0, 'max_value': 1000},
+                    {'name': 'Cutting Speed', 'type': 'Speed', 'unit': 'mm/s', 'min_value': 0, 'max_value': 500},
+                    {'name': 'Assist Gas Pressure', 'type': 'Pressure', 'unit': 'bar', 'min_value': 0, 'max_value': 25}
+                ]
+            },
+            {
+                'name': 'Assembly Line AL200',
+                'type': 'Assembly Line',
+                'status': 'active',
+                'sensors': [
+                    {'name': 'Line Speed', 'type': 'Speed', 'unit': 'units/hr', 'min_value': 0, 'max_value': 1000},
+                    {'name': 'Motor Temperature', 'type': 'Temperature', 'unit': '°C', 'min_value': 0, 'max_value': 120},
+                    {'name': 'Power Consumption', 'type': 'Power', 'unit': 'kW', 'min_value': 0, 'max_value': 50}
+                ]
+            },
+            {
+                'name': 'Heat Treatment Furnace HT600',
+                'type': 'Heat Treatment',
+                'status': 'active',
+                'sensors': [
+                    {'name': 'Chamber Temperature', 'type': 'Temperature', 'unit': '°C', 'min_value': 0, 'max_value': 1200},
+                    {'name': 'Humidity', 'type': 'Humidity', 'unit': '%RH', 'min_value': 0, 'max_value': 100},
+                    {'name': 'Gas Flow Rate', 'type': 'Flow', 'unit': 'L/min', 'min_value': 0, 'max_value': 100}
+                ]
+            }
+        ]
+
+        # Add machines and their sensors to the database
+        for machine_data in machines:
+            machine = Machine(
+                name=machine_data['name'],
+                type=machine_data['type'],
+                status=machine_data['status']
+            )
+            db.session.add(machine)
+            db.session.flush()  # Get the machine ID
+
+            # Add sensors for this machine
+            for sensor_data in machine_data['sensors']:
+                sensor = Sensor(
+                    machine_id=machine.id,
+                    name=sensor_data['name'],
+                    type=sensor_data['type'],
+                    unit=sensor_data['unit'],
+                    min_value=sensor_data['min_value'],
+                    max_value=sensor_data['max_value']
+                )
+                db.session.add(sensor)
+
         db.session.commit()
-        print("Created test machine successfully")
+        print("Created machines and sensors successfully")
         
     except Exception as e:
         print(f"Error initializing database: {str(e)}")
