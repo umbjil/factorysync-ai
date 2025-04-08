@@ -18,3 +18,9 @@ gevent-websocket==0.10.1
 flask-migrate==4.0.7
 psycopg2-binary==2.9.9
 eventlet==0.35.2
+
+# Industrial Protocol Support
+asyncua>=1.0.0
+pymodbus>=3.0.0
+requests>=2.25.1
+aiohttp>=3.8.0
