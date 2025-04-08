@@ -233,8 +233,12 @@ def health_check():
         }), 500
 
 # Manual database initialization endpoint (protected)
-@app.route('/init-db', methods=['GET'])
+@app.route('/init-db', methods=['POST'])
 def manual_init_db():
+    auth_header = request.headers.get('Authorization')
+    if not auth_header or auth_header != f"Bearer {os.environ.get('SECRET_KEY', 'dev-key-please-change')}":
+        return jsonify({'status': 'error', 'message': 'Unauthorized'}), 401
+        
     try:
         init_db()
         return jsonify({'status': 'success', 'message': 'Database initialized successfully'}), 200
