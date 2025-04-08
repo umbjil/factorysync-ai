@@ -52,7 +52,11 @@ def init_db():
     """Initialize the database and create a test user if it doesn't exist."""
     with app.app_context():
         try:
+            # Drop all tables and recreate them
+            db.drop_all()
             db.create_all()
+            
+            # Create admin user
             if not User.query.filter_by(username='admin').first():
                 admin = User(username='admin', email='admin@example.com')
                 admin.set_password('admin123')
@@ -61,9 +65,21 @@ def init_db():
                 print("Created admin user successfully")
             else:
                 print("Admin user already exists")
+                
+            # Create a test machine
+            test_machine = Machine(
+                name='Test Machine',
+                type='Assembly',
+                status='active'
+            )
+            db.session.add(test_machine)
+            db.session.commit()
+            print("Created test machine successfully")
+            
         except Exception as e:
             print(f"Error initializing database: {str(e)}")
             db.session.rollback()
+            raise
 
 # Initialize database before first request
 @app.before_first_request
