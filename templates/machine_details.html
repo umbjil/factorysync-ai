@@ -1,0 +1,289 @@
+{% extends "base.html" %}
+
+{% block title %}Machine Details - {{ machine.machine_id }}{% endblock %}
+
+{% block content %}
+<div class="row">
+    <!-- Machine Info -->
+    <div class="col-md-4">
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">
+                    <i class="bi bi-robot me-2"></i>Machine Information
+                </h5>
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-4">ID</dt>
+                    <dd class="col-sm-8">{{ machine.machine_id }}</dd>
+
+                    <dt class="col-sm-4">Type</dt>
+                    <dd class="col-sm-8">{{ config['MACHINE_TYPES'][machine.type]['name'] }}</dd>
+
+                    <dt class="col-sm-4">Model</dt>
+                    <dd class="col-sm-8">{{ config['MACHINE_TYPES'][machine.type]['model'] }}</dd>
+
+                    <dt class="col-sm-4">Status</dt>
+                    <dd class="col-sm-8">
+                        <span class="badge bg-{{ 'success' if machine.state == 'RUNNING' else 'warning' if machine.state == 'IDLE' else 'danger' }}">
+                            {{ machine.state }}
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-4">Operation</dt>
+                    <dd class="col-sm-8">{{ machine.operation or 'N/A' }}</dd>
+
+                    <dt class="col-sm-4">Location</dt>
+                    <dd class="col-sm-8">{{ machine.location or 'N/A' }}</dd>
+
+                    <dt class="col-sm-4">Data Source</dt>
+                    <dd class="col-sm-8">{{ machine.data_source|title }}</dd>
+                </dl>
+            </div>
+        </div>
+
+        <!-- Maintenance Info -->
+        <div class="card mb-4">
+            <div class="card-header d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">
+                    <i class="bi bi-tools me-2"></i>Maintenance
+                </h5>
+                {% if 'write' in config['ROLES'][current_user.role]['permissions'] %}
+                <button class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#logMaintenanceModal">
+                    <i class="bi bi-plus-circle me-1"></i>Log Maintenance
+                </button>
+                {% endif %}
+            </div>
+            <div class="card-body">
+                <dl class="row">
+                    <dt class="col-sm-6">Last Maintenance</dt>
+                    <dd class="col-sm-6">{{ machine.last_maintenance|datetime }}</dd>
+
+                    <dt class="col-sm-6">Next Due</dt>
+                    <dd class="col-sm-6">
+                        {% set days = ((machine.next_maintenance - now).days if machine.next_maintenance else 0) %}
+                        <span class="badge bg-{{ 'danger' if days <= 0 else 'warning' if days <= 7 else 'success' }}">
+                            {{ machine.next_maintenance|datetime }}
+                            ({{ 'Overdue' if days <= 0 else 'Due in ' + days|string + ' days' }})
+                        </span>
+                    </dd>
+
+                    <dt class="col-sm-6">Interval</dt>
+                    <dd class="col-sm-6">{{ machine.maintenance_interval }} hours</dd>
+
+                    <dt class="col-sm-6">Operating Hours</dt>
+                    <dd class="col-sm-6">{{ machine.operating_hours|round(1) }}</dd>
+                </dl>
+            </div>
+        </div>
+    </div>
+
+    <!-- Charts -->
+    <div class="col-md-8">
+        <div class="card mb-4">
+            <div class="card-header">
+                <ul class="nav nav-tabs card-header-tabs" role="tablist">
+                    <li class="nav-item">
+                        <a class="nav-link active" data-bs-toggle="tab" href="#temperature">Temperature</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#rpm">RPM</a>
+                    </li>
+                    <li class="nav-item">
+                        <a class="nav-link" data-bs-toggle="tab" href="#tool-wear">Tool Wear</a>
+                    </li>
+                </ul>
+            </div>
+            <div class="card-body">
+                <div class="tab-content">
+                    <div class="tab-pane fade show active" id="temperature">
+                        <div id="temperature-chart"></div>
+                    </div>
+                    <div class="tab-pane fade" id="rpm">
+                        <div id="rpm-chart"></div>
+                    </div>
+                    <div class="tab-pane fade" id="tool-wear">
+                        <div id="tool-wear-chart"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Alerts and Predictions -->
+        <div class="row">
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Active Alerts
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if alerts %}
+                        <div class="list-group">
+                            {% for alert in alerts %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ alert.message }}</h6>
+                                    <small class="text-muted">{{ alert.created_at|datetime }}</small>
+                                </div>
+                                <small class="text-{{ 'danger' if alert.severity == 'CRITICAL' else 'warning' if alert.severity == 'WARNING' else 'info' }}">
+                                    {{ alert.severity }}
+                                </small>
+                                {% if 'write' in config['ROLES'][current_user.role]['permissions'] %}
+                                <button class="btn btn-sm btn-outline-secondary float-end acknowledge-alert" data-alert-id="{{ alert.id }}">
+                                    Acknowledge
+                                </button>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No active alerts</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="col-md-6">
+                <div class="card mb-4">
+                    <div class="card-header">
+                        <h5 class="mb-0">
+                            <i class="bi bi-graph-up me-2"></i>Latest Predictions
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        {% if predictions %}
+                        <div class="list-group">
+                            {% for prediction in predictions %}
+                            <div class="list-group-item">
+                                <div class="d-flex w-100 justify-content-between">
+                                    <h6 class="mb-1">{{ prediction.prediction_type }}</h6>
+                                    <small class="text-muted">{{ prediction.timestamp|datetime }}</small>
+                                </div>
+                                <div class="progress" style="height: 20px;">
+                                    <div class="progress-bar bg-{{ 'danger' if prediction.probability > 0.7 else 'warning' if prediction.probability > 0.3 else 'success' }}"
+                                        role="progressbar"
+                                        style="width: {{ (prediction.probability * 100)|round|int }}%">
+                                        {{ (prediction.probability * 100)|round|int }}%
+                                    </div>
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% else %}
+                        <p class="text-muted">No predictions available</p>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Log Maintenance Modal -->
+{% if 'write' in config['ROLES'][current_user.role]['permissions'] %}
+<div class="modal fade" id="logMaintenanceModal" tabindex="-1">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title">Log Maintenance</h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <form action="{{ url_for('log_maintenance') }}" method="post">
+                <input type="hidden" name="machine_id" value="{{ machine.id }}">
+                <div class="modal-body">
+                    <div class="mb-3">
+                        <label class="form-label">Maintenance Type</label>
+                        <select class="form-select" name="type" required>
+                            <option value="routine">Routine Maintenance</option>
+                            <option value="repair">Repair</option>
+                            <option value="upgrade">Upgrade</option>
+                            <option value="emergency">Emergency Maintenance</option>
+                        </select>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Description</label>
+                        <textarea class="form-control" name="description" rows="3" required></textarea>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Duration (minutes)</label>
+                        <input type="number" class="form-control" name="duration" required>
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Cost</label>
+                        <input type="number" class="form-control" name="cost" step="0.01">
+                    </div>
+                    <div class="mb-3">
+                        <label class="form-label">Parts Replaced</label>
+                        <input type="text" class="form-control" name="parts" placeholder="Comma-separated list">
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Log Maintenance</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+{% endif %}
+{% endblock %}
+
+{% block scripts %}
+<script>
+// Initialize charts
+const temperatureChart = JSON.parse('{{ charts.temperature|safe }}');
+const rpmChart = JSON.parse('{{ charts.rpm|safe }}');
+const toolWearChart = JSON.parse('{{ charts.tool_wear|safe }}');
+
+Plotly.newPlot('temperature-chart', temperatureChart.data, temperatureChart.layout);
+Plotly.newPlot('rpm-chart', rpmChart.data, rpmChart.layout);
+Plotly.newPlot('tool-wear-chart', toolWearChart.data, toolWearChart.layout);
+
+// Handle alert acknowledgments
+document.querySelectorAll('.acknowledge-alert').forEach(button => {
+    button.addEventListener('click', function() {
+        const alertId = this.dataset.alertId;
+        fetch(`/alert/${alertId}/acknowledge`, {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json'
+            }
+        }).then(response => {
+            if (response.ok) {
+                this.closest('.list-group-item').remove();
+            }
+        });
+    });
+});
+
+// Auto-refresh data
+setInterval(() => {
+    fetch(window.location.href)
+        .then(response => response.text())
+        .then(html => {
+            const parser = new DOMParser();
+            const doc = parser.parseFromString(html, 'text/html');
+            
+            // Update status
+            document.querySelector('.machine-status').innerHTML = doc.querySelector('.machine-status').innerHTML;
+            
+            // Update charts
+            const newCharts = {
+                temperature: JSON.parse(doc.getElementById('temperature-chart').dataset.chart),
+                rpm: JSON.parse(doc.getElementById('rpm-chart').dataset.chart),
+                toolWear: JSON.parse(doc.getElementById('tool-wear-chart').dataset.chart)
+            };
+            
+            Plotly.update('temperature-chart', newCharts.temperature.data[0]);
+            Plotly.update('rpm-chart', newCharts.rpm.data[0]);
+            Plotly.update('tool-wear-chart', newCharts.toolWear.data[0]);
+            
+            // Update alerts and predictions
+            document.querySelector('#alerts').innerHTML = doc.querySelector('#alerts').innerHTML;
+            document.querySelector('#predictions').innerHTML = doc.querySelector('#predictions').innerHTML;
+        });
+}, 30000);  // Refresh every 30 seconds
+</script>
+{% endblock %}

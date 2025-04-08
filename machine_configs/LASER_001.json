@@ -1,0 +1,42 @@
+{
+    "machine_id": "LASER_001",
+    "name": "Laser Cutter",
+    "type": "LASER",
+    "sensors": {
+        "laser_power": {
+            "unit": "watts",
+            "min_value": 0,
+            "max_value": 500,
+            "warning_min": 50,
+            "warning_max": 450
+        },
+        "focus_distance": {
+            "unit": "mm",
+            "min_value": 0,
+            "max_value": 50,
+            "warning_min": 5,
+            "warning_max": 45
+        },
+        "cutting_speed": {
+            "unit": "mm/s",
+            "min_value": 0,
+            "max_value": 100,
+            "warning_min": 10,
+            "warning_max": 90
+        },
+        "material_thickness": {
+            "unit": "mm",
+            "min_value": 0,
+            "max_value": 20,
+            "warning_min": 0.1,
+            "warning_max": 15
+        },
+        "temperature": {
+            "unit": "celsius",
+            "min_value": 0,
+            "max_value": 100,
+            "warning_min": 20,
+            "warning_max": 80
+        }
+    }
+}
