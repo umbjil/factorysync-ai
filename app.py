@@ -51,12 +51,24 @@ def load_user(user_id):
 def init_db():
     """Initialize the database and create a test user if it doesn't exist."""
     with app.app_context():
-        db.create_all()
-        if not User.query.filter_by(username='admin').first():
-            admin = User(username='admin', email='admin@example.com')
-            admin.set_password('admin123')
-            db.session.add(admin)
-            db.session.commit()
+        try:
+            db.create_all()
+            if not User.query.filter_by(username='admin').first():
+                admin = User(username='admin', email='admin@example.com')
+                admin.set_password('admin123')
+                db.session.add(admin)
+                db.session.commit()
+                print("Created admin user successfully")
+            else:
+                print("Admin user already exists")
+        except Exception as e:
+            print(f"Error initializing database: {str(e)}")
+            db.session.rollback()
+
+# Initialize database before first request
+@app.before_first_request
+def initialize_database():
+    init_db()
 
 @app.route('/', methods=['GET'])
 def index():
@@ -207,10 +219,29 @@ def internal_error(error):
 # Health check endpoint for Render
 @app.route('/health', methods=['GET'])
 def health_check():
-    return jsonify({'status': 'healthy'}), 200
+    try:
+        # Test database connection
+        db.session.execute('SELECT 1')
+        return jsonify({
+            'status': 'healthy',
+            'database': 'connected'
+        }), 200
+    except Exception as e:
+        return jsonify({
+            'status': 'unhealthy',
+            'database': str(e)
+        }), 500
+
+# Manual database initialization endpoint (protected)
+@app.route('/init-db', methods=['GET'])
+def manual_init_db():
+    try:
+        init_db()
+        return jsonify({'status': 'success', 'message': 'Database initialized successfully'}), 200
+    except Exception as e:
+        return jsonify({'status': 'error', 'message': str(e)}), 500
 
 if __name__ == '__main__':
-    init_db()
     port = int(os.environ.get('PORT', 5000))
     if os.environ.get('RENDER'):
         socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
