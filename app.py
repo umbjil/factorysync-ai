@@ -10,6 +10,7 @@ from functools import wraps
 from models import db, User, Machine, Sensor, DataPoint, SensorReading, ModelMetrics
 from data_collector import DataCollector
 from ml_module import ContinuousMLTrainer
+from data_simulator import DataSimulator
 
 app = Flask(__name__)
 
@@ -38,6 +39,9 @@ if os.environ.get('RENDER'):
     socketio = SocketIO(app, cors_allowed_origins=['https://factorysync-ai.onrender.com'])
 else:
     socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Initialize data simulator
+simulator = DataSimulator(app)
 
 # Login manager setup
 login_manager = LoginManager()
@@ -192,7 +196,15 @@ def login():
 @app.route('/dashboard', methods=['GET'])
 @login_required
 def dashboard():
+    # Start the simulator when someone accesses the dashboard
+    simulator.start()
     return render_template('dashboard.html')
+
+@app.route('/stop-simulation', methods=['POST'])
+@login_required
+def stop_simulation():
+    simulator.stop()
+    return jsonify({'status': 'success', 'message': 'Simulation stopped'})
 
 @app.route('/logout', methods=['GET'])
 @login_required
@@ -335,6 +347,38 @@ def manual_init_db():
         return jsonify({'status': 'success', 'message': 'Database initialized successfully'}), 200
     except Exception as e:
         return jsonify({'status': 'error', 'message': str(e)}), 500
+
+# WebSocket events for real-time updates
+@socketio.on('connect')
+def handle_connect():
+    print('Client connected')
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    print('Client disconnected')
+
+@socketio.on('request_sensor_data')
+def handle_sensor_data_request(data):
+    """Handle real-time sensor data requests."""
+    machine_id = data.get('machine_id')
+    if machine_id:
+        # Get the latest readings for the machine
+        readings = SensorReading.query.join(Sensor).filter(
+            Sensor.machine_id == machine_id
+        ).order_by(SensorReading.timestamp.desc()).limit(10).all()
+        
+        # Format the data
+        data = [{
+            'sensor_name': reading.sensor.name,
+            'value': reading.value,
+            'timestamp': reading.timestamp.isoformat(),
+            'anomaly_score': reading.anomaly_score
+        } for reading in readings]
+        
+        socketio.emit('sensor_data_update', {
+            'machine_id': machine_id,
+            'readings': data
+        })
 
 if __name__ == '__main__':
     port = int(os.environ.get('PORT', 5000))
