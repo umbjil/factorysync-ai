@@ -32,7 +32,12 @@ app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 # Initialize extensions
 db.init_app(app)
 migrate = Migrate(app, db)
-socketio = SocketIO(app, cors_allowed_origins="*")
+
+# Configure SocketIO with appropriate CORS settings for Render
+if os.environ.get('RENDER'):
+    socketio = SocketIO(app, cors_allowed_origins=['https://factorysync-ai.onrender.com'])
+else:
+    socketio = SocketIO(app, cors_allowed_origins="*")
 
 # Login manager setup
 login_manager = LoginManager()
@@ -199,7 +204,15 @@ def internal_error(error):
     db.session.rollback()
     return render_template('500.html'), 500
 
+# Health check endpoint for Render
+@app.route('/health', methods=['GET'])
+def health_check():
+    return jsonify({'status': 'healthy'}), 200
+
 if __name__ == '__main__':
     init_db()
     port = int(os.environ.get('PORT', 5000))
-    socketio.run(app, host='0.0.0.0', port=port)
+    if os.environ.get('RENDER'):
+        socketio.run(app, host='0.0.0.0', port=port, allow_unsafe_werkzeug=True)
+    else:
+        socketio.run(app, host='0.0.0.0', port=port)
